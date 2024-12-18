@@ -304,7 +304,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // 스토리 불러오기
 function initializeStories() {
-  fetchJSON("/json/stories.json", (data) => {
+  fetchJSON("./json/stories.json", (data) => {
       const storyList = document.querySelector(".story-list");
       if (!storyList) return console.error("스토리 목록 컨테이너가 없습니다.");
 
