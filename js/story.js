@@ -1,6 +1,56 @@
-// 작업할 때 일시정지 끄기
-// let isPlaying = false; 
-let isPlaying = true;
+// 메인에서 스토리 이동
+// URL 매개변수 추출
+const params = new URLSearchParams(window.location.search);
+const userId = parseInt(params.get("userId")); // 숫자로 변환
+
+// 페이지 로드 시 실행
+loadStoryDetails();
+preloadImagesFromJSON(); // 데이터 로딩 + 초기화
+
+async function loadStoryDetails() {
+  try {
+    const response = await fetch("../json/stories.json");
+    const data = await response.json();
+    const stories = data.stories;
+
+    // userId 비교 시 숫자로 변환된 값을 사용
+    const story = stories.find((item) => item.userId === userId);
+    if (!story) {
+      console.error("해당 스토리를 찾을 수 없습니다.");
+      return;
+    }
+
+    renderStoryDetails(story);
+  } catch (error) {
+    console.error("스토리 로드 실패:", error);
+  }
+}
+
+function renderStoryDetails(story) {
+  const storyImg = document.getElementById("story-main-img-img");
+  const storyUsername = document.getElementById("story-profile-name");
+  const storyUploadTime = document.getElementById("story-upload-time");
+
+  // 첫 번째 스토리 미디어와 프로필 데이터 로드
+  const firstStory = story.stories[0];
+
+  storyImg.src = firstStory.mediaUrl;
+  storyUsername.textContent = story.username;
+  storyUploadTime.textContent = new Date(firstStory.timestamp).toLocaleString();
+}
+
+function renderStoryDetails(story) {
+  const storyImg = document.getElementById("story-main-img-img");
+  const storyUsername = document.getElementById("story-profile-name");
+  const storyUploadTime = document.getElementById("story-upload-time");
+
+  // 첫 번째 스토리 미디어와 프로필 데이터 로드
+  const firstStory = story.stories[0];
+
+  storyImg.src = firstStory.mediaUrl;
+  storyUsername.textContent = story.username;
+  storyUploadTime.textContent = new Date(firstStory.timestamp).toLocaleString();
+}
 
 // 하단부 액션 - 엘리멘트 호출
 const dmContainer = document.getElementById("story-bottom-dm");
@@ -14,7 +64,7 @@ let currentStoryIndex = 0;
 let currentMediaIndex = 0;
 let storiesData = [];
 
-fetch("./json/stories.json")
+fetch("../json/stories.json")
   .then((response) => {
     if (!response.ok) {
       throw new Error("업로드 대실패!");
@@ -29,12 +79,51 @@ fetch("./json/stories.json")
     console.error("JSON Fetching Error", error);
   });
 
+// 이미지 미리 로딩 함수
+async function preloadImagesFromJSON() {
+  try {
+    const response = await fetch("../json/stories.json");
+    const data = await response.json();
+
+    // 모든 미디어 URL 수집
+    const imageUrls = data.stories.flatMap((story) =>
+      story.stories.map((item) => item.mediaUrl)
+    );
+
+    // 이미지 사전 로딩
+    const preloadPromises = imageUrls.map((url) => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.src = url;
+        img.onload = resolve; // 성공 시
+        img.onerror = reject; // 실패 시
+      });
+    });
+
+    // 모든 이미지 로딩 후 데이터 저장 및 초기화
+    await Promise.all(preloadPromises);
+
+    storiesData = data.stories;
+    initializeStories(); // 초기화 실행
+  } catch (error) {
+    console.error("이미지 사전 로딩 실패:", error);
+  }
+}
+
 function initializeStories() {
-  if (storiesData.length === 0) {
-    return;
+  if (storiesData.length === 0) return;
+
+  // URL의 userId 기반으로 currentStoryIndex 설정
+  const initialIndex = storiesData.findIndex(
+    (story) => story.userId === userId
+  );
+  if (initialIndex !== -1) {
+    currentStoryIndex = initialIndex;
+    currentMediaIndex = 0; // 항상 첫 번째 스토리부터 시작
   }
 
   updateStories(currentStoryIndex, currentMediaIndex);
+  updateSideStories();
 
   const prevUserIndex1 =
     (currentStoryIndex - 2 + storiesData.length) % storiesData.length;
@@ -57,6 +146,7 @@ function initializeStories() {
     updateSideStory("story-side-stories-right4", nextUserIndex2, 0);
   }
 }
+
 // placeholder
 function handlePlaceholder() {
   if (dmInput.textContent.trim() === "") {
@@ -68,22 +158,19 @@ function handlePlaceholder() {
 
 handlePlaceholder();
 dmInput.addEventListener("input", handlePlaceholder);
+
 // json 데이터 가져오고 출력
-
-
-
 function updateSideStory(containerId, userIndex, mediaIndex) {
-	const user = storiesData[userIndex];
-	const story = user.stories[mediaIndex];
+  const user = storiesData[userIndex];
+  const story = user.stories[mediaIndex];
 
-	const container = document.getElementById(containerId);
-	container.querySelector('img[id$="user-img"]').src = user.profileImage;
-	container.querySelector('div[id$="username"]').textContent = user.username;
-	container.querySelector('div[id$="upload-time"]').textContent =
-		formatTimestamp(story.timestamp);
-	container.querySelector('img[id$="img"]').src = story.mediaUrl;
+  const container = document.getElementById(containerId);
+  container.querySelector('img[id$="user-img"]').src = user.profileImage;
+  container.querySelector('div[id$="username"]').textContent = user.username;
+  container.querySelector('div[id$="upload-time"]').textContent =
+    formatTimestamp(story.timestamp);
+  container.querySelector('img[id$="img"]').src = story.mediaUrl;
 }
-
 
 // 시간 스탬프 계산
 function formatTimestamp(timestamp) {
@@ -99,40 +186,54 @@ function formatTimestamp(timestamp) {
   }
 }
 
-// 사이드 스토리 클릭시 이동
-const storyContainers = {
-  "story-side-stories-left1": -2,
-  "story-side-stories-left2": -1,
-  "story-side-stories-right3": 1,
-  "story-side-stories-right4": 2,
-};
-
-Object.entries(storyContainers).forEach(([containerId, offset]) => {
-  const container = document.getElementById(containerId);
-  container.addEventListener("click", () => handleStoryClick(offset));
-});
-
-
-function handleStoryClick(offset) {
-  currentStoryIndex =
-    (currentStoryIndex + offset + storiesData.length) % storiesData.length;
-  currentMediaIndex = 0;
-
-  updateStories(currentStoryIndex, currentMediaIndex);
-  updateSideStories();
-}
-
 // 로고, x 클릭시 홈으로 이동 - 추후 링크 변화시 수정 필요
 document.getElementById("story-out-logo").addEventListener("click", () => {
   window.location.href = "index.html";
 });
 
-document.getElementById("story-out-btn").addEventListener("click", () => {
-  window.location.href = "index.html";
+document.querySelectorAll("#story-out-btn").forEach((button) => {
+  button.addEventListener("click", () => {
+    window.location.href = "index.html";
+  });
 });
 
+// 재생 시간 바 생성
+function createLoadingBars() {
+  const barContainer = document.getElementById("story-loading-bar-container");
+  barContainer.innerHTML = "";
+
+  const currentUserStories = storiesData[currentStoryIndex].stories;
+  currentUserStories.forEach((_, index) => {
+    const bar = document.createElement("div");
+    bar.classList.add("story-loading-bar");
+    bar.style.flex = `1`;
+    bar.style.marginRight = index < currentUserStories.length - 1 ? "3px" : "0";
+    barContainer.appendChild(bar);
+  });
+}
+
+function updateLoadingBar(mediaIndex) {
+  const bars = document.querySelectorAll(".story-loading-bar");
+
+  bars.forEach((bar, index) => {
+    if (index < mediaIndex) {
+      bar.style.width = "100%";
+      bar.classList.add("active");
+    } else if (index === mediaIndex) {
+      bar.style.width = "0%";
+      setTimeout(() => {
+        bar.style.width = "100%";
+        bar.classList.add("active");
+      }, 10);
+    } else {
+      bar.style.width = "0%";
+      bar.classList.remove("active");
+    }
+  });
+}
+
 // 재생 - 일시정지 버튼
-// let isPlaying = true;
+let isPlaying = true;
 
 function togglePlayPause() {
   isPlaying = !isPlaying;
@@ -153,15 +254,41 @@ document
   .getElementById("story-btn-play")
   .addEventListener("click", togglePlayPause);
 
+// 자동 재생 구현
+let timer;
+let progressInterval;
+const STORY_DURATION = 4000;
+
+function startAutoPlay() {
+  if (!isPlaying) return;
+
+  clearTimeout(timer);
+  clearInterval(progressInterval);
+
+  // 현재 바 애니메이션 시작
+  const currentBar =
+    document.querySelectorAll(".story-loading-bar")[currentMediaIndex];
+  currentBar.style.transition = `width ${STORY_DURATION}ms linear`;
+  currentBar.style.width = "100%";
+
+  // 사진 전환 설정
+  timer = setTimeout(() => {
+    moveToNextStory();
+    startAutoPlay();
+  }, STORY_DURATION);
+}
+
 // 모달 열기
 function modalOpen() {
   const modal = document.getElementById("story-modal-overlay");
   modal.classList.remove("modal-hidden");
 }
 
-document
-  .getElementById("story-btn-meatball")
-  .addEventListener("click", modalOpen);
+// 미디어 쿼리로 인해 미트볼 버튼 2개 작동
+const meatballButtons = document.querySelectorAll("#story-btn-meatball");
+meatballButtons.forEach((button) => {
+  button.addEventListener("click", modalOpen);
+});
 
 // 모달 닫기 - 취소 버튼
 document.querySelector("#btn-취소").addEventListener("click", () => {
@@ -176,11 +303,7 @@ window.addEventListener("click", (event) => {
   }
 });
 
-
-
 // 디엠 input form
-
-
 // 입력창 focus 시 img 어둡게, 버튼 숨기고 입력창 확장
 const dmOverlay = document.getElementById("story-dm-overlay");
 const quickEmotion = document.getElementById("story-dm-quickemotion");
@@ -190,12 +313,12 @@ dmInput.addEventListener("focus", () => {
   heartButton.classList.add("btn-hidden");
   dmButton.classList.add("btn-hidden");
   dmContainer.classList.add("dm-expand");
-	if (dmInput.textContent.trim() !== "") {
-		dmContainer.classList.add("send-btn-active");
-		quickEmotion.classList.add("quickemotion-hidden");
-	} else {
-		quickEmotion.classList.remove("quickemotion-hidden");
-	}
+  if (dmInput.textContent.trim() !== "") {
+    dmContainer.classList.add("send-btn-active");
+    quickEmotion.classList.add("quickemotion-hidden");
+  } else {
+    quickEmotion.classList.remove("quickemotion-hidden");
+  }
 });
 
 dmInput.addEventListener("blur", (event) => {
@@ -209,9 +332,9 @@ dmInput.addEventListener("blur", (event) => {
   dmContainer.classList.remove("dm-expand");
   dmContainer.classList.remove("send-btn-active");
   quickEmotion.classList.add("quickemotion-hidden");
-	if (dmInput.textContent.trim() !== "") {
-		dmContainer.classList.add("send-btn-active");
-	}
+  if (dmInput.textContent.trim() !== "") {
+    dmContainer.classList.add("send-btn-active");
+  }
 });
 
 // 보내기 버튼
@@ -249,7 +372,7 @@ sendButton.addEventListener("click", (event) => {
 // 빠른 공감 버튼
 function handleQuickEmotion() {
   if (dmInput.textContent.trim() === "") {
-		quickEmotion.classList.remove("quickemotion-hidden");
+    quickEmotion.classList.remove("quickemotion-hidden");
   } else {
     quickEmotion.classList.add("quickemotion-hidden");
   }
@@ -268,7 +391,6 @@ quickemotionBtn.forEach((btn) => {
     dmContainer.classList.remove("send-btn-active");
     quickEmotion.classList.add("quickemotion-hidden");
     dmInput.blur();
-
 
     setTimeout(() => {
       sendModal.classList.remove("send-modal-visible");
@@ -329,9 +451,6 @@ function updateStoryWidth() {
   story.style.width = `${storyWidth}px`;
 }
 
-updateStoryWidth();
-window.addEventListener("resize", updateStoryWidth);
-
 // 양옆 < > 버튼 동시 hover
 const prevBtn = document.getElementById("story-prev-btn");
 const nextBtn = document.getElementById("story-next-btn");
@@ -387,7 +506,7 @@ function moveToPrevStory() {
     if (currentStoryIndex < 0) {
       currentStoryIndex = storiesData.length - 1;
     }
-		currentMediaIndex = 0;
+    currentMediaIndex = 0;
   }
   updateStories(currentStoryIndex, currentMediaIndex);
   updateSideStories();
@@ -403,7 +522,7 @@ function updateStories(userIndex, mediaIndex) {
   document.querySelector("#story-upload-time").textContent = formatTimestamp(
     story.timestamp
   );
-	dmInput.setAttribute("placeholder", `${user.username}님에게 답장하기...`);
+  dmInput.setAttribute("placeholder", `${user.username}님에게 답장하기...`);
 
   createLoadingBars();
   updateLoadingBar(mediaIndex);
@@ -436,61 +555,243 @@ function updateSideStory(containerId, userIndex, mediaIndex) {
   container.querySelector('img[id$="img"]').src = story.mediaUrl;
 }
 
-// 재생 시간 바 생성
-function createLoadingBars() {
-  const barContainer = document.getElementById("story-loading-bar-container");
-  barContainer.innerHTML = "";
-
-  const currentUserStories = storiesData[currentStoryIndex].stories;
-  currentUserStories.forEach((_, index) => {
-    const bar = document.createElement("div");
-    bar.classList.add("story-loading-bar");
-    bar.style.flex = `1`;
-    bar.style.marginRight = index < currentUserStories.length - 1 ? "3px" : "0";
-    barContainer.appendChild(bar);
-  });
-}
-
-function updateLoadingBar(mediaIndex) {
-  const bars = document.querySelectorAll(".story-loading-bar");
-
-  bars.forEach((bar, index) => {
-    if (index < mediaIndex) {
-      bar.style.width = "100%";
-      bar.classList.add("active");
-    } else if (index === mediaIndex) {
-      bar.style.width = "0%";
-      setTimeout(() => {
-        bar.style.width = "100%";
-        bar.classList.add("active");
-      }, 10);
+// 작은 미디어(767px 이하)일 때 클릭 시 next, prev 함수 호출
+document.querySelector("#story-main-img").addEventListener("click", (event) => {
+  const clickX = event.offsetX;
+  const windowWidth = window.innerWidth;
+  if (windowWidth < 768) {
+    if (clickX > event.currentTarget.clientWidth * (1 / 4)) {
+      moveToNextStory();
     } else {
-      bar.style.width = "0%";
-      bar.classList.remove("active");
+      moveToPrevStory();
     }
-  });
+  }
+});
+
+// 사이드 스토리 클릭시 이동
+const storyContainers = {
+  "story-side-stories-left1": -2,
+  "story-side-stories-left2": -1,
+  "story-side-stories-right3": 1,
+  "story-side-stories-right4": 2,
+};
+
+Object.entries(storyContainers).forEach(([containerId, offset]) => {
+  const container = document.getElementById(containerId);
+  container.addEventListener("click", () => handleStoryClick(offset));
+});
+
+function handleStoryClick(offset) {
+  currentStoryIndex =
+    (currentStoryIndex + offset + storiesData.length) % storiesData.length;
+  currentMediaIndex = 0;
+
+  updateStories(currentStoryIndex, currentMediaIndex);
+  updateSideStories();
 }
 
-// 자동 재생 구현
-let timer;
-let progressInterval;
-const STORY_DURATION = 4000;
+// 창 크기 변경 시 스토리 사이즈 조정
+function resizeStories() {
+  const story = document.querySelector(".story");
+  const windowHeight = window.innerHeight;
+  const maxWidth = 50;
 
-function startAutoPlay() {
-  if (!isPlaying) return;
+  const calculatedWidth = (window.innerWidth * maxWidth) / 100;
+  const calculatedHeight = calculatedWidth * (686 / 386);
 
-  clearTimeout(timer);
-  clearInterval(progressInterval);
+  if (calculatedHeight > windowHeight) {
+    story.style.width = `${(windowHeight * 386) / 686}px`;
+    story.style.height = `${windowHeight}px`;
+  } else {
+    story.style.width = `${calculatedWidth}px`;
+    story.style.height = `${calculatedHeight}px`;
+  }
+}
 
-  // 현재 바 애니메이션 시작
-  const currentBar =
-    document.querySelectorAll(".story-loading-bar")[currentMediaIndex];
-  currentBar.style.transition = `width ${STORY_DURATION}ms linear`;
-  currentBar.style.width = "100%";
+// 큰사이즈
+function adjustStoriesForLargeScreens() {
+  const centerStory = document.querySelector(".story");
+  const leftStory1 = document.querySelector("#story-side-stories-left1");
+  const leftStory2 = document.querySelector("#story-side-stories-left2");
+  const rightStory3 = document.querySelector("#story-side-stories-right3");
+  const rightStory4 = document.querySelector("#story-side-stories-right4");
 
-  // 사진 전환 설정
-  timer = setTimeout(() => {
-    moveToNextStory();
-    startAutoPlay();
-  }, STORY_DURATION);
+  const aspectRatio = 386 / 686; // 스토리의 가로/세로 비율
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+
+  if (windowWidth >= 1400) {
+    // 중앙 스토리 크기 계산
+    let centerStoryWidth = Math.min(windowWidth * 0.3, 800);
+    let centerStoryHeight = centerStoryWidth / aspectRatio;
+    if (centerStoryHeight > windowHeight * 0.8) {
+      centerStoryHeight = windowHeight * 0.8;
+      centerStoryWidth = centerStoryHeight * aspectRatio;
+    }
+
+    // 중앙 스토리 적용
+    centerStory.style.width = `${centerStoryWidth}px`;
+    centerStory.style.height = `${centerStoryHeight}px`;
+    centerStory.style.aspectRatio = `${aspectRatio}`;
+    centerStory.style.overflow = "hidden";
+    centerStory.querySelector("img").style.objectFit = "cover";
+
+    // 양쪽 스토리 크기 계산
+    let sideStoryWidth = centerStoryWidth * 0.4;
+    let sideStoryHeight = sideStoryWidth / aspectRatio;
+
+    [leftStory1, leftStory2].forEach((story) => {
+      if (story) {
+        story.style.width = `${sideStoryWidth}px`;
+        story.style.height = `${sideStoryHeight}px`;
+        story.style.aspectRatio = `${aspectRatio}`;
+        story.style.overflow = "hidden";
+        const img = story.querySelector("img");
+        if (img) img.style.objectFit = "cover";
+      }
+    });
+
+    [rightStory3, rightStory4].forEach((story) => {
+      if (story) {
+        story.style.width = `${sideStoryWidth}px`;
+        story.style.height = `${sideStoryHeight}px`;
+        story.style.aspectRatio = `${aspectRatio}`;
+        story.style.overflow = "hidden";
+        const img = story.querySelector("img");
+        if (img) img.style.objectFit = "cover";
+      }
+    });
+  }
+}
+
+// 5개 크기, 3개 크기 마진
+function adjustStoriesForMediumScreens() {
+  const centerStory = document.querySelector(".story");
+  const aspectRatio = 386 / 686; // 스토리의 가로/세로 비율
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+
+  if (windowWidth >= 1023 && windowWidth <= 1399) {
+    // 중앙 스토리 크기 설정
+    let centerStoryHeight = Math.min(windowHeight * 0.9, 1000);
+    let centerStoryWidth = centerStoryHeight * aspectRatio;
+
+    const topBottomMargin = (windowHeight - centerStoryHeight) / 10; // 위아래 마진 추가 (10% 여유)
+
+    centerStory.style.height = `${centerStoryHeight}px`;
+    centerStory.style.width = `${centerStoryWidth}px`;
+    centerStory.style.marginTop = `${topBottomMargin}px`;
+    centerStory.style.marginBottom = `${topBottomMargin}px`;
+    centerStory.style.position = "relative";
+  } else if (windowWidth >= 768 && windowWidth <= 1022) {
+    // 중앙 스토리 크기 설정
+    let centerStoryHeight = Math.min(windowHeight * 0.9, 1000); // 높이 90% 또는 최대 500px
+    let centerStoryWidth = centerStoryHeight * aspectRatio;
+
+    const topBottomMargin = (windowHeight - centerStoryHeight) / 15; // 위아래 마진 추가 (7.5% 여유)
+
+    centerStory.style.height = `${centerStoryHeight}px`;
+    centerStory.style.width = `${centerStoryWidth}px`;
+    centerStory.style.marginTop = `${topBottomMargin}px`;
+    centerStory.style.marginBottom = `${topBottomMargin}px`;
+    centerStory.style.position = "relative";
+  }
+}
+
+// 작은 사이즈
+function adjustStoriesForSmallScreens() {
+  const centerStory = document.querySelector(".story");
+  const aspectRatio = 386 / 686; // 스토리의 가로/세로 비율
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+
+  const storyPlayButton = document.getElementById("story-btn-play");
+
+  if (windowWidth <= 767) {
+    let storyWidth, storyHeight;
+
+    if (windowWidth / windowHeight > aspectRatio) {
+      // 화면이 더 넓은 경우, 높이를 기준으로 크기 설정
+      storyHeight = windowHeight;
+      storyWidth = storyHeight * aspectRatio;
+    } else {
+      // 화면이 더 좁은 경우, 너비를 기준으로 크기 설정
+      storyWidth = windowWidth;
+      storyHeight = storyWidth / aspectRatio;
+    }
+
+    centerStory.style.width = `${storyWidth}px`;
+    centerStory.style.height = `${storyHeight}px`;
+
+    // 자동 재생 및 버튼
+    if (!isPlaying) {
+      isPlaying = true;
+      startAutoPlay();
+      storyPlayButton.innerHTML = `<svg aria-label="일시 정지" class="x1lliihq x1n2onr6 xq3z1fi" fill="currentColor" height="16" role="img" viewBox="0 0 48 48" width="16"><title>일시 정지</title><path d="M15 1c-3.3 0-6 1.3-6 3v40c0 1.7 2.7 3 6 3s6-1.3 6-3V4c0-1.7-2.7-3-6-3zm18 0c-3.3 0-6 1.3-6 3v40c0 1.7 2.7 3 6 3s6-1.3 6-3V4c0-1.7-2.7-3-6-3z"></path></svg>`;
+    }
+  }
+}
+
+function centerElements() {
+  const stories = document.querySelector("#stories");
+  const storyButtons = document.querySelector("#story-next-prev-btns");
+
+  const windowHeight = window.innerHeight;
+
+  if (stories) {
+    const storiesHeight = stories.offsetHeight;
+    const storiesTop = (windowHeight - storiesHeight) / 2;
+    stories.style.position = "absolute";
+    stories.style.top = `${storiesTop}px`;
+  }
+
+  if (storyButtons) {
+    const buttonsHeight = storyButtons.offsetHeight || 0;
+    const buttonsTop = (windowHeight - buttonsHeight) / 2;
+    storyButtons.style.position = "absolute";
+    storyButtons.style.top = `${buttonsTop}px`;
+    storyButtons.style.left = "50%";
+    storyButtons.style.transform = "translate(-50%, -50%)";
+  }
+}
+
+// 창 크기 변경시 호출할 함수 모음
+const resizeFunctions = [
+  updateStoryWidth,
+  resizeStories,
+  adjustStoriesForLargeScreens,
+  adjustStoriesForMediumScreens,
+  adjustStoriesForSmallScreens,
+  centerElements,
+  handleMeatballToggle,
+];
+
+// 초기 실행: 페이지 로드 시 `resizeFunctions` 실행
+document.addEventListener("DOMContentLoaded", () => {
+  requestAnimationFrame(() => {
+    resizeFunctions.forEach((fn) => fn());
+    updateStoryWidth(); // 강제 업데이트
+    centerElements(); // 버튼 위치 재계산
+  });
+});
+
+// 창 크기 변경 시 함수 실행
+window.addEventListener("resize", () => {
+  resizeFunctions.forEach((fn) => fn());
+});
+
+// 재생버튼을 미트볼로 변경
+document.addEventListener("DOMContentLoaded", handleMeatballToggle);
+
+function handleMeatballToggle() {
+  const stopHidden = document.querySelector(".stop-hidden");
+  const meatballToggle = document.querySelector(".meatball-hidden");
+
+  if (window.innerWidth <= 767) {
+    stopHidden.style.display = "none";
+    meatballToggle.style.display = "block";
+  } else {
+    if (stopHidden) stopHidden.style.display = "block";
+    if (meatballToggle) meatballToggle.style.display = "none";
+  }
 }
