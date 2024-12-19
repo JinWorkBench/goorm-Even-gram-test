@@ -1,4 +1,4 @@
-import { loadButtonActions } from "/sidebar.js";
+import { loadButtonActions } from "./js/sidebar.js";
 
 document.addEventListener("DOMContentLoaded", () => {
 	toggleNavContainer();
@@ -11,30 +11,24 @@ window.addEventListener("resize", () => {
 	toggleNavContainer();
 });
 
-function renderHTML(id, html) {
-	fetch(html)
+function renderHTML(containerId, filePath) {
+	fetch(filePath)
 		.then((response) => {
 			if (!response.ok) {
-				throw new Error(`Failed to load ${html}`);
+				throw new Error(`Failed to load ${filePath}`);
 			}
 			return response.text();
 		})
 		.then((html) => {
-			const container = document.getElementById(id);
-			console.log(id);
-			container.innerHTML = html;
-
-			if (id === "right-side-bar") {
-				loadButtonActions();
-			}
+			document.getElementById(containerId).innerHTML = html;
 		})
 		.catch((error) => {
-			console.error("Error loading sidebar:", error);
+			console.error("Error in renderHTML:", error);
 		});
 }
 
 function fetchUser() {
-	fetch("./json/profile.json")
+	fetch("./json/profile.json", { mode: "same-origin" })
 		.then((response) => {
 			if (!response.ok) {
 				console.log("error");
