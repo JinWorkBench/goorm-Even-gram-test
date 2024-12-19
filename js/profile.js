@@ -2,8 +2,8 @@ import { loadButtonActions } from "./sidebar.js";
 
 document.addEventListener("DOMContentLoaded", () => {
 	toggleNavContainer();
-	renderHTML("right-side-bar", "../components/sidebar.html");
-	renderHTML("footer-container", "../components/footer.html");
+	renderHTML("right-side-bar", "./components/sidebar.html");
+	renderHTML("footer-container", "./components/footer.html");
 	fetchUser();
 });
 
@@ -239,10 +239,10 @@ function createHoverContainer(post) {
 	hoverItem.className = "profile__post-hover-item";
 
 	hoverItem.appendChild(
-		createHoverItem("../assets/icons/profile_post_like.png", post.likes)
+		createHoverItem("./assets/icons/profile_post_like.png", post.likes)
 	);
 	hoverItem.appendChild(
-		createHoverItem("../assets/icons/profile_post_comment.png", post.comments)
+		createHoverItem("./assets/icons/profile_post_comment.png", post.comments)
 	);
 
 	hoverContainer.appendChild(hoverItem);
