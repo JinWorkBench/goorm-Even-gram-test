@@ -329,7 +329,7 @@ async function loadStories() {
 
       // 스토리 항목 클릭 시 이동 (userId 전달)
       storyItem.addEventListener("click", () => {
-        const url = `/story.html?userId=${story.userId}`;
+        const url = `./story.html?userId=${story.userId}`;
         window.location.href = url;
       });
       storyList.appendChild(storyItem);
