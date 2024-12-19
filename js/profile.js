@@ -1,4 +1,4 @@
-import { loadButtonActions } from "./js/sidebar.js";
+import { loadButtonActions } from "./sidebar";
 
 document.addEventListener("DOMContentLoaded", () => {
 	toggleNavContainer();
